@@ -1,8 +1,11 @@
-package org.vivoweb.oai_pmh_client;
+/* $This file is distributed under the terms of the license in LICENSE$ */
+
+package org.vivoweb.joai_connector;
 
 import java.io.File;
 import java.net.URI;
 import java.net.http.HttpRequest;
+import java.net.http.HttpRequest.BodyPublishers;
 import java.net.http.HttpResponse;
 import java.net.http.HttpResponse.BodyHandlers;
 import java.util.HashMap;
@@ -22,30 +25,39 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ObjectNode;
 
-public class ClientStarter {
+public class Connector {
 	private static Options options = new Options();
-	private static Logger log = LoggerFactory.getLogger(ClientStarter.class);
+	private static Logger log = LoggerFactory.getLogger(Connector.class);
 	private static final String apiSuffix = "api/dataRequest/";
 	static final String apiConfigSuffix = "OAI PMH sets configuration";
     private static final ObjectMapper mapper = new ObjectMapper();
 
 	public static void main(String[] args) {
-		Option URL_OPTION = new Option("url", true, "VIVO URL");
+		Option URL_OPTION = new Option("url", true, "Vitro/VIVO URL");
 		Option DATA_OPTION = new Option("data", true, "Path to data directory");
+		Option USER_OPTION = new Option("user", true, "Vitro/VIVO User");
+		Option PASS_OPTION = new Option("pass", true, "Path to data directory");
 		options.addOption(URL_OPTION);
 		options.addOption(DATA_OPTION);
+		options.addOption(USER_OPTION);
+		options.addOption(PASS_OPTION);
 		CommandLineParser parser = new DefaultParser();
 		try {
 			CommandLine cmdline = parser.parse(options, args);
 			String urlInput = URL_OPTION.getOpt();
 			String dataPath = DATA_OPTION.getOpt();
+			String user = USER_OPTION.getOpt();
+			String pass = PASS_OPTION.getOpt();
 			if (!cmdline.hasOption(urlInput) || !cmdline.hasOption(urlInput)) {
 				exitAndUsage();
 			}
-			File dataDir = new File(fixUrlSlash(cmdline, dataPath));
+			File dataDir = new File(cmdline.getOptionValue(dataPath));
 			URI baseUrl = URI.create(fixUrlSlash(cmdline, urlInput));
 			Http.init();
 			checkDataDir(dataDir);
+			if (cmdline.hasOption(user) && cmdline.hasOption(pass)) {
+				authorize(baseUrl, cmdline.getOptionValue(user), cmdline.getOptionValue(pass));
+			}
 			checkUrl(baseUrl);
 			new DataSetProcessor(dataDir, baseUrl, 100).processAll(getConfiguration(baseUrl));
 		} catch (ParseException e) {
@@ -113,6 +125,36 @@ public class ClientStarter {
 			}
 	}
 
+	private static void authorize(URI baseUrl, String user, String pass) {
+		URI uri = URI.create(baseUrl.toString() + "authenticate");
+        String body = "";
+        body += "loginName=" + Http.encode(user);
+        body += "&loginPassword=" + Http.encode(pass);
+        body += "&loginForm=Log+in";
+		HttpRequest request = HttpRequest
+				.newBuilder(uri)
+                .headers("Content-Type", "application/x-www-form-urlencoded")
+				.POST(BodyPublishers.ofString(body))
+				.build();
+		try {
+			HttpResponse<String> response = Http.getClient().send(request, BodyHandlers.ofString());
+			if (response.statusCode() != 200) {
+				log.error(uri.toString());
+				log.error("VIVO is not accessible. status code " + response.statusCode());
+				exit();
+			}
+			
+		} catch (Exception e) {
+			log.error(e.getMessage());
+			exit();
+		}
+		
+	}
+	
+	   public static String addPart(String name, String value) {
+	        return name + "=" + Http.encode(value);
+	    }
+	
 	private static String fixUrlSlash(CommandLine cmdline, String urlInput) {
 		String url = cmdline.getOptionValue(urlInput);
 		if (!url.endsWith("/")) {
@@ -147,6 +189,6 @@ public class ClientStarter {
 	}
 
 	private static void printUsage() {
-		new HelpFormatter().printHelp("java -jar client.jar", options);
+		new HelpFormatter().printHelp("java -jar joai_connector.jar", options);
 	}
 }

@@ -1,4 +1,6 @@
-package org.vivoweb.oai_pmh_client;
+/* $This file is distributed under the terms of the license in LICENSE$ */
+
+package org.vivoweb.joai_connector;
 
 import java.io.StringReader;
 import java.net.URI;

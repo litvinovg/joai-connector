@@ -1,6 +1,9 @@
-package org.vivoweb.oai_pmh_client;
+/* $This file is distributed under the terms of the license in LICENSE$ */
+
+package org.vivoweb.joai_connector;
 
 import java.io.UnsupportedEncodingException;
+import java.net.CookieManager;
 import java.net.URLEncoder;
 import java.net.http.HttpClient;
 import java.net.http.HttpClient.Redirect;
@@ -20,6 +23,7 @@ public class Http {
 		httpClient = HttpClient.newBuilder()
 			.version(Version.HTTP_2)
 			.followRedirects(Redirect.ALWAYS)
+			.cookieHandler(new CookieManager())
 			.connectTimeout(Duration.ofSeconds(3))
 			.build();
 	}
