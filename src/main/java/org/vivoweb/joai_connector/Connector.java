@@ -33,10 +33,10 @@ public class Connector {
     private static final ObjectMapper mapper = new ObjectMapper();
 
 	public static void main(String[] args) {
-		Option URL_OPTION = new Option("url", true, "Vitro/VIVO URL");
+		Option URL_OPTION = new Option("url", true, "Vitro/VIVO instance URL");
 		Option DATA_OPTION = new Option("data", true, "Path to data directory");
-		Option USER_OPTION = new Option("user", true, "Vitro/VIVO User");
-		Option PASS_OPTION = new Option("pass", true, "Path to data directory");
+		Option USER_OPTION = new Option("user", true, "Vitro/VIVO user email");
+		Option PASS_OPTION = new Option("pass", true, "Vitro/VIVO password");
 		options.addOption(URL_OPTION);
 		options.addOption(DATA_OPTION);
 		options.addOption(USER_OPTION);
@@ -58,7 +58,6 @@ public class Connector {
 			if (cmdline.hasOption(user) && cmdline.hasOption(pass)) {
 				authorize(baseUrl, cmdline.getOptionValue(user), cmdline.getOptionValue(pass));
 			}
-			checkUrl(baseUrl);
 			new DataSetProcessor(dataDir, baseUrl, 100).processAll(getConfiguration(baseUrl));
 		} catch (ParseException e) {
 			log.error(e.getMessage());
@@ -110,21 +109,6 @@ public class Connector {
 		}
 	}
 
-	private static void checkUrl(URI uri) {
-			HttpRequest request = HttpRequest.newBuilder(uri).GET().build();
-			try {
-				HttpResponse<String> response = Http.getClient().send(request, BodyHandlers.ofString());
-				if (response.statusCode() != 200) {
-					log.error("VIVO is not accessible. status code " + response.statusCode());
-					exit();
-				}
-				
-			} catch (Exception e) {
-				log.error(e.getMessage());
-				exit();
-			}
-	}
-
 	private static void authorize(URI baseUrl, String user, String pass) {
 		URI uri = URI.create(baseUrl.toString() + "authenticate");
         String body = "";
@@ -142,6 +126,10 @@ public class Connector {
 				log.error(uri.toString());
 				log.error("VIVO is not accessible. status code " + response.statusCode());
 				exit();
+			}
+			if (response.body().contains("id=\"login\"")) {
+				log.error("Authorization didn't succeed.");
+				exitAndUsage();
 			}
 			
 		} catch (Exception e) {
