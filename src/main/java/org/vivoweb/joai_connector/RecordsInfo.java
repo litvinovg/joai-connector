@@ -112,8 +112,13 @@ public class RecordsInfo {
 
 	private URI createSearchUrl(long start) {
 		String url = baseUrl.toString() + SEARCH_SUFFIX + resultsPerRequest;
-		url += "&" + Http.encode(FILTER_PREFIX + config.get(CONFIG_OPTION_FILTER_NAME)) + "="
-				+ Http.encode(config.get(CONFIG_OPTION_FILTER_VALUE)) + START_INDEX + "=" + start;
+		url += "&" 
+				+ Http.encode(FILTER_PREFIX + config.get(CONFIG_OPTION_FILTER_NAME)) 
+				+ "="
+				+ config.get(CONFIG_OPTION_FILTER_NAME)
+				+ Http.encode(":")
+				+ Http.encode(config.get(CONFIG_OPTION_FILTER_VALUE))
+				+ START_INDEX + "=" + start;
 		return URI.create(url);
 	}
 }
