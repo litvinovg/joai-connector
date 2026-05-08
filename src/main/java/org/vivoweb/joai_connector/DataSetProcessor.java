@@ -37,8 +37,8 @@ public class DataSetProcessor {
 		this.resultsPerRequest = resultsPerRequest.toString();
 	}
 
-	public void processAll(Map<String, Map<String, String>> configuration) {
-		for(Entry<String, Map<String, String>> entry  : configuration.entrySet()) {
+	public void processAll(Map<String, Map<String, Set<String>>> configuration) {
+		for(Entry<String, Map<String, Set<String>>> entry  : configuration.entrySet()) {
 			String name = entry.getKey();
 			log.info(String.format("Started updating %s", name));
 			processCollection(name, entry.getValue());
@@ -47,9 +47,15 @@ public class DataSetProcessor {
 		
 	}
 
-	private void processCollection(String name, Map<String, String> config) {
-		Map<String, Instant> recordList = new RecordsInfo(baseUrl, resultsPerRequest, config).getRecordList(name);
-		String endpoint = config.get("endpoint");
+	private void processCollection(String name, Map<String, Set<String>> config) {
+		Map<String, Instant> recordList = new RecordsInfo(baseUrl, resultsPerRequest, config, name).getRecordList();
+		Set<String> endpointSet = config.get("endpoint");
+		if (endpointSet.size() != 1) {
+			log.error(String.format("Error. Only one endpoint per collection is supported. Provided %s",
+					endpointSet.size()));
+			return;
+		}
+		String endpoint = endpointSet.iterator().next();
 		Set<String> processedFileNames = new HashSet<>();
 		File collectionDir =  new File(dataDir, encode(name));
 		collectionDir.mkdir();
@@ -72,7 +78,7 @@ public class DataSetProcessor {
 		
 	}
 
-	private void updateRecords(Map<String, String> config, Map<String, Instant> recordList, String endpoint,
+	private void updateRecords(Map<String, Set<String>> config, Map<String, Instant> recordList, String endpoint,
 			Set<String> processedFileNames, File collectionDir) {
 		for (Entry<String, Instant> entry : recordList.entrySet()) {
 			String uri = entry.getKey();
@@ -136,7 +142,7 @@ public class DataSetProcessor {
 		return URI.create(baseUrl.toString() + API_PREFIX + Http.encode(endpoint) + "?uri=" + Http.encode(uri)) ;
 	}
 
-	private String getFileName(String attrValue, Map<String, String> config) {
+	private String getFileName(String attrValue, Map<String, Set<String>> config) {
 		attrValue = encode(attrValue);
 		if (config.containsKey(CONFIG_OPTION_SUFFIX)) {
 			attrValue += config.get(CONFIG_OPTION_SUFFIX);

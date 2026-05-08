@@ -9,7 +9,9 @@ import java.net.http.HttpRequest.BodyPublishers;
 import java.net.http.HttpResponse;
 import java.net.http.HttpResponse.BodyHandlers;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.CommandLineParser;
@@ -26,11 +28,12 @@ import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ObjectNode;
 
 public class Connector {
+	private static final String DIRECTORY_CONFIGURATION_OPTION = "directory";
 	private static Options options = new Options();
 	private static Logger log = LoggerFactory.getLogger(Connector.class);
 	private static final String apiSuffix = "api/dataRequest/";
-	static final String apiConfigSuffix = "OAI PMH sets configuration";
-    private static final ObjectMapper mapper = new ObjectMapper();
+	static final String apiConfigSuffix = "OAI PMH Configuration";
+	private static final ObjectMapper mapper = new ObjectMapper();
 
 	public static void main(String[] args) {
 		Option URL_OPTION = new Option("url", true, "Vitro/VIVO instance URL");
@@ -64,11 +67,11 @@ public class Connector {
 		}
 	}
 
-	private static Map<String,Map<String,String>> getConfiguration(URI url) {
+	private static Map<String, Map<String, Set<String>>> getConfiguration(URI url) {
 		String configurationUrl = url.toString() + apiSuffix + Http.encode(apiConfigSuffix);
 		URI configUri = URI.create(configurationUrl);
 		HttpRequest request = HttpRequest.newBuilder(configUri).GET().build();
-		Map<String,Map<String,String>> configuration = new HashMap<>();
+		Map<String, Map<String, Set<String>>> configuration = new HashMap<>();
 		try {
 			HttpResponse<String> response = Http.getClient().send(request, BodyHandlers.ofString());
 			if (response.statusCode() != 200) {
@@ -96,30 +99,36 @@ public class Connector {
 		return configuration;
 	}
 
-	private static void processConfigurationItem(Map<String, Map<String, String>> configuration, JsonNode data) {
-		ObjectNode config = data.asObject();
-		Map<String, String> settings = new HashMap<>();
-		for (String name : config.propertyNames()) {
-			String value = config.at("/" + name + "/value").asString();
-			if (name.equals("directory")) {
-				configuration.put(value, settings);
-			} else {
-				settings.put(name, value);
+	private static void processConfigurationItem(Map<String, Map<String, Set<String>>> configuration, JsonNode data) {
+		ObjectNode sparqlJsonConfiguration = data.asObject();
+		String directoryName = sparqlJsonConfiguration.at("/directory/value").asString();
+		Map<String, Set<String>> collectionConfiguration = configuration.get(directoryName);
+		if (collectionConfiguration == null) {
+			collectionConfiguration = new HashMap<>();
+			configuration.put(directoryName, collectionConfiguration);
+		}
+		for (String name : sparqlJsonConfiguration.propertyNames()) {
+			if (name.equals(DIRECTORY_CONFIGURATION_OPTION)) {
+				continue;
 			}
+			String value = sparqlJsonConfiguration.at("/" + name + "/value").asString();
+			Set<String> set = collectionConfiguration.get(name);
+			if (set == null) {
+				set = new HashSet<>();
+				collectionConfiguration.put(name, set);
+			}
+			set.add(value);
 		}
 	}
 
 	private static void authorize(URI baseUrl, String user, String pass) {
 		URI uri = URI.create(baseUrl.toString() + "authenticate");
-        String body = "";
-        body += "loginName=" + Http.encode(user);
-        body += "&loginPassword=" + Http.encode(pass);
-        body += "&loginForm=Log+in";
-		HttpRequest request = HttpRequest
-				.newBuilder(uri)
-                .headers("Content-Type", "application/x-www-form-urlencoded")
-				.POST(BodyPublishers.ofString(body))
-				.build();
+		String body = "";
+		body += "loginName=" + Http.encode(user);
+		body += "&loginPassword=" + Http.encode(pass);
+		body += "&loginForm=Log+in";
+		HttpRequest request = HttpRequest.newBuilder(uri).headers("Content-Type", "application/x-www-form-urlencoded")
+				.POST(BodyPublishers.ofString(body)).build();
 		try {
 			HttpResponse<String> response = Http.getClient().send(request, BodyHandlers.ofString());
 			if (response.statusCode() != 200) {
@@ -131,18 +140,18 @@ public class Connector {
 				log.error("Authorization didn't succeed.");
 				exitAndUsage();
 			}
-			
+
 		} catch (Exception e) {
 			log.error(e.getMessage());
 			exit();
 		}
-		
+
 	}
-	
-	   public static String addPart(String name, String value) {
-	        return name + "=" + Http.encode(value);
-	    }
-	
+
+	public static String addPart(String name, String value) {
+		return name + "=" + Http.encode(value);
+	}
+
 	private static String fixUrlSlash(CommandLine cmdline, String urlInput) {
 		String url = cmdline.getOptionValue(urlInput);
 		if (!url.endsWith("/")) {

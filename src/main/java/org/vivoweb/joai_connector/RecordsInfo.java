@@ -10,6 +10,7 @@ import java.net.http.HttpResponse.BodyHandlers;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
@@ -24,9 +25,8 @@ import org.w3c.dom.NodeList;
 import org.xml.sax.InputSource;
 
 public class RecordsInfo {
-	private static final String CONFIG_OPTION_FILTER_VALUE = "filterValue";
-	private static final String CONFIG_OPTION_FILTER_NAME = "filterName";
-	private static final String FILTER_PREFIX = "filters_";
+	private static final String CONFIG_OPTION_FILTER = "filter";
+	private static final String FILTERS_PREFIX = "filters";
 	private static final String NAME_ATTR = "name";
 	private static final String MOD_TIME_ATTR = "modTime";
 	private static final String URI_ATTR = "uri";
@@ -40,9 +40,10 @@ public class RecordsInfo {
 	private URI baseUrl;
 	private String resultsPerRequest;
 	private DocumentBuilder builder;
-	private Map<String, String> config;
+	private Map<String, Set<String>> collectionConfig;
+	private String name;
 
-	public RecordsInfo(URI baseUrl, String resultsPerRequest, Map<String, String> config) {
+	public RecordsInfo(URI baseUrl, String resultsPerRequest, Map<String, Set<String>> config, String name) {
 		try {
 			builder = DocumentBuilderFactory.newInstance().newDocumentBuilder();
 		} catch (ParserConfigurationException e) {
@@ -51,16 +52,26 @@ public class RecordsInfo {
 		}
 		this.baseUrl = baseUrl;
 		this.resultsPerRequest = resultsPerRequest;
-		this.config = config;
+		this.collectionConfig = config;
+		this.name = name;
 	}
 
-	public Map<String, Instant> getRecordList(String name) {
+	public Map<String, Instant> getRecordList() {
+		Map<String, Instant> collectionRecords = new HashMap<>();
+		Set<String> filters = collectionConfig.get(CONFIG_OPTION_FILTER);
+		for (String filter : filters) {
+			getFilteredRecords(collectionRecords, filter);	
+		}
+		return collectionRecords;
+	}
+
+	private void getFilteredRecords(Map<String, Instant> collectionRecords, String filter) {
 		Map<String, Instant> records = new HashMap<>();
 		Long numFound = 0L;
 		Long start = 0L;
 		Integer foundlength = 0;
 		do {
-			URI searchUrl = createSearchUrl(start + foundlength);
+			URI searchUrl = createSearchUrl(start + foundlength, filter);
 			HttpRequest request = HttpRequest.newBuilder(searchUrl).GET().build();
 			try {
 				HttpResponse<String> response = Http.getClient().send(request, BodyHandlers.ofString());
@@ -83,7 +94,7 @@ public class RecordsInfo {
 				break;
 			}
 		} while (start < numFound && foundlength > 0);
-		return records;
+		collectionRecords.putAll(records);
 	}
 
 	private void readRecord(Map<String, Instant> records, Integer foundlength, NodeList docs) {
@@ -110,14 +121,10 @@ public class RecordsInfo {
 		}
 	}
 
-	private URI createSearchUrl(long start) {
+	private URI createSearchUrl(long start, String filter) {
 		String url = baseUrl.toString() + SEARCH_SUFFIX + resultsPerRequest;
 		url += "&" 
-				+ Http.encode(FILTER_PREFIX + config.get(CONFIG_OPTION_FILTER_NAME)) 
-				+ "="
-				+ config.get(CONFIG_OPTION_FILTER_NAME)
-				+ Http.encode(":")
-				+ Http.encode(config.get(CONFIG_OPTION_FILTER_VALUE))
+				+ Http.encode(FILTERS_PREFIX) + "=" + Http.encode(filter)
 				+ START_INDEX + "=" + start;
 		return URI.create(url);
 	}
