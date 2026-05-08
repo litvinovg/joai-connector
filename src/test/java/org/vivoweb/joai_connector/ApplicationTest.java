@@ -1,4 +1,4 @@
-package org.vivoweb.oai_pmh_client;
+package org.vivoweb.joai_connector;
 
 import org.junit.jupiter.api.Test;
 

@@ -22,16 +22,16 @@ import org.apache.commons.io.FileUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class DataSetProcessor {
+public class CollectionProcessor {
 	private static final String API_PREFIX = "api/dataRequest/";
 	private static final String XML_HEADER = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n";
 	private static final String CONFIG_OPTION_SUFFIX = "suffix";
-	private static Logger log = LoggerFactory.getLogger(DataSetProcessor.class);
+	private static Logger log = LoggerFactory.getLogger(CollectionProcessor.class);
 	private URI baseUrl;
 	private File dataDir;
 	private String resultsPerRequest;
 
-	public DataSetProcessor(File dataDir, URI baseUrl, Integer resultsPerRequest) {
+	public CollectionProcessor(File dataDir, URI baseUrl, Integer resultsPerRequest) {
 		this.baseUrl = baseUrl;
 		this.dataDir = dataDir;
 		this.resultsPerRequest = resultsPerRequest.toString();
@@ -48,7 +48,7 @@ public class DataSetProcessor {
 	}
 
 	private void processCollection(String name, Map<String, Set<String>> config) {
-		Map<String, Instant> recordList = new RecordsInfo(baseUrl, resultsPerRequest, config, name).getRecordList();
+		Map<String, Instant> recordList = new RecordsInfo(baseUrl, resultsPerRequest, config, name).getRecords();
 		Set<String> endpointSet = config.get("endpoint");
 		if (endpointSet.size() != 1) {
 			log.error(String.format("Error. Only one endpoint per collection is supported. Provided %s",

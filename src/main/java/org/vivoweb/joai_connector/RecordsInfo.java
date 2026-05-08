@@ -56,7 +56,7 @@ public class RecordsInfo {
 		this.name = name;
 	}
 
-	public Map<String, Instant> getRecordList() {
+	public Map<String, Instant> getRecords() {
 		Map<String, Instant> collectionRecords = new HashMap<>();
 		Set<String> filters = collectionConfig.get(CONFIG_OPTION_FILTER);
 		for (String filter : filters) {

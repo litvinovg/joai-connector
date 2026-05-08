@@ -61,7 +61,7 @@ public class Connector {
 			if (cmdline.hasOption(user) && cmdline.hasOption(pass)) {
 				authorize(baseUrl, cmdline.getOptionValue(user), cmdline.getOptionValue(pass));
 			}
-			new DataSetProcessor(dataDir, baseUrl, 100).processAll(getConfiguration(baseUrl));
+			new CollectionProcessor(dataDir, baseUrl, 100).processAll(getConfiguration(baseUrl));
 		} catch (ParseException e) {
 			log.error(e.getMessage());
 		}
