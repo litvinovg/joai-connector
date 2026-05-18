@@ -3,6 +3,8 @@
 package org.vivoweb.joai_connector;
 
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpRequest;
 import java.net.http.HttpRequest.BodyPublishers;
@@ -11,6 +13,7 @@ import java.net.http.HttpResponse.BodyHandlers;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
+import java.util.Properties;
 import java.util.Set;
 
 import org.apache.commons.cli.CommandLine;
@@ -32,38 +35,64 @@ public class Connector {
 	private static Options options = new Options();
 	private static Logger log = LoggerFactory.getLogger(Connector.class);
 	private static final String apiSuffix = "api/dataRequest/";
-	static final String apiConfigSuffix = "OAI PMH Configuration";
+	private static final String apiConfigSuffix = "OAI PMH Configuration";
 	private static final ObjectMapper mapper = new ObjectMapper();
-
-	public static void main(String[] args) {
-		Option URL_OPTION = new Option("url", true, "Vitro/VIVO instance URL");
-		Option DATA_OPTION = new Option("data", true, "Path to data directory");
-		Option USER_OPTION = new Option("user", true, "Vitro/VIVO user email");
-		Option PASS_OPTION = new Option("pass", true, "Vitro/VIVO password");
+	private static Option URL_OPTION = new Option("url", true, "Vitro/VIVO instance URL");
+	private static Option DATA_OPTION = new Option("data", true, "Path to data directory");
+	private static Option USER_OPTION = new Option("user", true, "Vitro/VIVO user email");
+	private static Option PASS_OPTION = new Option("pass", true, "Vitro/VIVO password");
+	private static Option CONFIG_OPTION = new Option("config", true, "Configuration path");
+	static {
+		options.addOption(CONFIG_OPTION);
 		options.addOption(URL_OPTION);
 		options.addOption(DATA_OPTION);
 		options.addOption(USER_OPTION);
 		options.addOption(PASS_OPTION);
+	}
+
+	public static void main(String[] args) {
+		Properties props = new Properties();
 		CommandLineParser parser = new DefaultParser();
+		Http.init();
 		try {
 			CommandLine cmdline = parser.parse(options, args);
-			String urlInput = URL_OPTION.getOpt();
-			String dataPath = DATA_OPTION.getOpt();
-			String user = USER_OPTION.getOpt();
-			String pass = PASS_OPTION.getOpt();
-			if (!cmdline.hasOption(urlInput) || !cmdline.hasOption(urlInput)) {
-				exitAndUsage();
-			}
-			File dataDir = new File(cmdline.getOptionValue(dataPath));
-			URI baseUrl = URI.create(fixUrlSlash(cmdline, urlInput));
-			Http.init();
+			readProperties(props, cmdline);
+			URI baseUrl = URI.create(fixUrlSlash(getValue(props, cmdline, URL_OPTION, false)));
+			File dataDir = new File(getValue(props, cmdline, DATA_OPTION, false));
 			checkDataDir(dataDir);
-			if (cmdline.hasOption(user) && cmdline.hasOption(pass)) {
-				authorize(baseUrl, cmdline.getOptionValue(user), cmdline.getOptionValue(pass));
+			String userEmail = getValue(props, cmdline, USER_OPTION, true);
+			String userPass = getValue(props, cmdline, PASS_OPTION, true);
+			if (userEmail != null && userPass != null) {
+				authorize(baseUrl, userEmail, userPass);
 			}
 			new CollectionProcessor(dataDir, baseUrl, 100).processAll(getConfiguration(baseUrl));
 		} catch (ParseException e) {
 			log.error(e.getMessage());
+		}
+	}
+
+	private static String getValue(Properties props, CommandLine cmdline, Option option, boolean optional) {
+		String inputValue;
+		String optionName = option.getOpt();
+		if (cmdline.hasOption(optionName)) {
+			inputValue = cmdline.getOptionValue(optionName);
+		} else {
+			inputValue = props.get(optionName) == null ? null : props.get(optionName).toString();
+		}
+		if (inputValue == null && !optional) {
+			exitAndUsage();
+		}
+		return inputValue;
+	}
+	
+	private static void readProperties(Properties props, CommandLine cmdline) {
+		String config = CONFIG_OPTION.getOpt();
+		if (cmdline.hasOption(config)) {
+			try (FileInputStream in = new FileInputStream(cmdline.getOptionValue(config))) {
+			    props.load(in);
+			} catch (IOException e) {
+			    log.error(e.getMessage());
+			}
 		}
 	}
 
@@ -152,8 +181,7 @@ public class Connector {
 		return name + "=" + Http.encode(value);
 	}
 
-	private static String fixUrlSlash(CommandLine cmdline, String urlInput) {
-		String url = cmdline.getOptionValue(urlInput);
+	private static String fixUrlSlash(String url) {
 		if (!url.endsWith("/")) {
 			url = url + "/";
 		}
