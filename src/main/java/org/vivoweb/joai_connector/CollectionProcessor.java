@@ -80,6 +80,7 @@ public class CollectionProcessor {
 
 	private void updateRecords(Map<String, Set<String>> config, Map<String, Instant> recordList, String endpoint,
 			Set<String> processedFileNames, File collectionDir) {
+		String lang = getLang(config.get("lang"));
 		for (Entry<String, Instant> entry : recordList.entrySet()) {
 			String uri = entry.getKey();
 			String fileName = getFileName(uri, config);
@@ -87,14 +88,14 @@ public class CollectionProcessor {
 			File file = new File(collectionDir, fileName);
 			try {
 				if (!file.exists()) {
-					updateRecord(entry, file, endpoint);
+					updateRecord(entry, file, endpoint, lang);
 				} else {
 					Instant fileModTime = Files.getLastModifiedTime(file.toPath()).toInstant();
 					Instant receivedModTime = entry.getValue();
 					if (fileModTime.isBefore(receivedModTime)) {
 						 String lastCheckTime = Storage.get(uri);
 						 if (lastCheckTime == null || Instant.parse(lastCheckTime).isBefore(receivedModTime)){
-							 updateRecord(entry, file, endpoint);
+							 updateRecord(entry, file, endpoint, lang);
 						 }
 					}
 				}
@@ -105,15 +106,19 @@ public class CollectionProcessor {
 		}
 	}
 
-	private void updateRecord(Entry<String, Instant> entry, File file, String endpoint) throws IOException {
-		String uri = entry.getKey();
-		URI recordUrl = createEndpointUrl(endpoint, uri);
+	private String getLang(Set<String> set) {
+		return set.isEmpty() ? null : set.iterator().next();
+	}
+
+	private void updateRecord(Entry<String, Instant> entry, File file, String endpoint, String lang) throws IOException {
+		String recordUri = entry.getKey();
+		URI recordUrl = createEndpointUrl(endpoint, recordUri, lang);
 		HttpRequest request = HttpRequest.newBuilder(recordUrl).GET().build();
 		try {
 			HttpResponse<String> response = Http.getClient().send(request, BodyHandlers.ofString());
 			if (response.statusCode() != 200) {
 				log.error(String.format("Request %s returned code %s.\nSkipping %s record.", recordUrl,
-						response.statusCode(), uri));
+						response.statusCode(), recordUri));
 				return;
 			}
 			String body = response.body();
@@ -123,14 +128,14 @@ public class CollectionProcessor {
 			}
 			String fullbody = XML_HEADER + body;
 			if(file.exists() && fullbody.equals(Files.readString(file.toPath()))) {
-				Storage.add(uri, Instant.now().toString());
+				Storage.add(recordUri, Instant.now().toString());
 				return;
 			}
 			FileUtils.writeStringToFile(file, fullbody, UTF_8);
 			Instant lastModTime = entry.getValue();
 			Files.setLastModifiedTime(file.toPath(), FileTime.from(lastModTime));
 			log.info(String.format("File %s has been updated.", file.getAbsoluteFile()));
-			Storage.remove(uri);
+			Storage.remove(recordUri);
 
 		} catch (Exception e) {
 			log.error(String.format("Error while updating record %s", file.getAbsolutePath()));
@@ -138,8 +143,12 @@ public class CollectionProcessor {
 		}
 	}
 
-	private URI createEndpointUrl(String endpoint, String uri) {
-		return URI.create(baseUrl.toString() + API_PREFIX + Http.encode(endpoint) + "?uri=" + Http.encode(uri)) ;
+	private URI createEndpointUrl(String endpoint, String uri, String lang) {
+		String urlString = baseUrl.toString() + API_PREFIX + Http.encode(endpoint) + "?uri=" + Http.encode(uri);
+		if (lang != null && !lang.isBlank()) {
+			urlString += "&lang=" + lang;
+		}
+		return URI.create(urlString) ;
 	}
 
 	private String getFileName(String attrValue, Map<String, Set<String>> config) {
