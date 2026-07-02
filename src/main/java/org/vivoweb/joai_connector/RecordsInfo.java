@@ -83,8 +83,8 @@ public class RecordsInfo {
 				String body = response.body();
 				Document document = builder.parse(new InputSource(new StringReader(body)));
 				Node result = document.getElementsByTagName(RESULT_EL).item(0);
-				numFound = Long.parseLong(result.getAttributes().getNamedItem(NUM_FOUND_ATTR).getTextContent());
-				start = Long.parseLong(result.getAttributes().getNamedItem(START_ATTR).getTextContent());
+				numFound = Long.parseLong(result.getAttributes().getNamedItem(NUM_FOUND_ATTR).getTextContent().replaceAll("[^0-9]", ""));
+				start = Long.parseLong(result.getAttributes().getNamedItem(START_ATTR).getTextContent().replaceAll("[^0-9]", ""));
 				NodeList docs = document.getElementsByTagName(DOC_EL);
 				foundlength = docs.getLength();
 				readRecord(records, foundlength, docs);
